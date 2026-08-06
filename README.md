@@ -47,6 +47,14 @@ Open **http://localhost:3002**
 
 **Runtime deps:** `express`, `cors` — the calculation engine itself has no astronomy dependencies.
 
+### Deploy on Render
+
+1. Push this repo to GitHub.
+2. In [Render](https://render.com) → **New → Blueprint**, connect the repo (uses `render.yaml`), or **New → Web Service** with:
+   - **Build:** `npm install`
+   - **Start:** `npm start`
+3. Open the service URL Render gives you (port is set via `PORT` automatically).
+
 ---
 
 ## Engine notes
