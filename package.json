@@ -1,0 +1,50 @@
+{
+  "name": "malayalam-calendar",
+  "version": "1.0.8",
+  "description": "Malayalam Hindu calendar (പഞ്ചാംഗം) for Kerala — nakshathram, tithi, kollavarsham, festivals, Nazhika timings, and CSV export. Pure JS astronomical engine.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "panchangam",
+    "malayalam",
+    "kerala",
+    "hindu-calendar",
+    "kollavarsham",
+    "nakshathram",
+    "nakshatra",
+    "tithi",
+    "panchang",
+    "jyotish",
+    "astronomy",
+    "sunrise",
+    "sunset",
+    "vishu",
+    "onam",
+    "rashi",
+    "yoga",
+    "karana",
+    "ayanamsa",
+    "ephemeris"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AjeshAB/malayalam-calendar.git"
+  },
+  "files": [
+    "index.js",
+    "src/",
+    "public/",
+    "server.js",
+    "README.md"
+  ],
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1"
+  }
+}
