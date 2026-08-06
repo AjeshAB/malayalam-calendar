@@ -1,6 +1,6 @@
 {
   "name": "malayalam-calendar",
-  "version": "1.0.8",
+  "version": "1.0.0",
   "description": "Malayalam Hindu calendar (പഞ്ചാംഗം) for Kerala — nakshathram, tithi, kollavarsham, festivals, Nazhika timings, and CSV export. Pure JS astronomical engine.",
   "main": "index.js",
   "scripts": {
@@ -29,7 +29,7 @@
     "ayanamsa",
     "ephemeris"
   ],
-  "author": "",
+  "author": "Ajesh AB",
   "license": "MIT",
   "type": "commonjs",
   "repository": {

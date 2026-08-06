@@ -128,6 +128,12 @@ Palm-leaf manuscript layout: aged palm ground, ink rules, stacked leaf sections 
 
 ---
 
+## Thanks
+
+Thanks to [Babuperumana](https://github.com/Babuperumana) for the original Malayalam Panchangam work this project builds on.
+
+---
+
 ## License
 
 MIT
