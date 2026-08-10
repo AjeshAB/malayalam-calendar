@@ -442,19 +442,8 @@ class Panchang {
          if (curr === next) {
             finalNakName = "ഇന്ന് നാൾ ഇല്ല";
          }
-         else {
-            // Check for Skipped Stars only if not repeated
-            let skipped = [];
-            let safety = 0;
-            while (curr !== next && safety < 5) {
-               curr = (curr + 1) % 27;
-               if (curr !== next) skipped.push(curr);
-               safety++;
-            }
-            if (skipped.length > 0) {
-               skipped.forEach(idx => finalNakName += " & " + NAKS[idx]);
-            }
-         }
+         // Stars between checkpoints are not compounded into the day name; they
+         // appear in DayNakshatras on the Hindu day they end.
       }
 
       // 5. Calculate Timings (Start/End)
@@ -488,27 +477,40 @@ class Panchang {
       const nakStartAngle = (currentData.nakIdx) * (360 / 27);
       const nakStartDate = findEndTime(nakStartAngle, jdNak - 1.0); // Search backwards roughly
 
-      // Full Day Details (Nakshatras overlapping this day 00:00 - 23:59)
-      const dayStart = new Date(d); dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(d); dayEnd.setHours(23, 59, 59, 999);
+      // Full Day Details — Hindu day is sunrise → next sunrise (not midnight).
+      // List stars that end in this window. If none do, keep the 6-nazhika
+      // checkpoint star that spans past next sunrise (Nazhika 60). Do not list a
+      // following/spanning star alongside one that already ends today.
+      let dayStart = sunTimes.sunriseDate;
+      let dayEnd = sunTimesNext.sunriseDate;
+      if (!dayStart) {
+         dayStart = new Date(d); dayStart.setHours(0, 0, 0, 0);
+      }
+      if (!dayEnd) {
+         dayEnd = new Date(d); dayEnd.setHours(24, 0, 0, 0);
+      }
 
       let dayNakshatras = [];
-      // Check Previous
+      // Previous star if it ends after this sunrise
       if (nakStartDate > dayStart) {
          const prevIdx = (currentData.nakIdx - 1 + 27) % 27;
-         // Find its start
          const prevStartAngle = prevIdx * (360 / 27);
          const prevStartDate = findEndTime(prevStartAngle, jdNak - 1.5);
          dayNakshatras.push({ name: NAKS[prevIdx], start: prevStartDate, end: nakStartDate });
       }
-      // Current
-      dayNakshatras.push({ name: NAKS[currentData.nakIdx], start: nakStartDate, end: nakEndDate });
-      // Next
-      if (nakEndDate < dayEnd) {
+      if (nakEndDate <= dayEnd) {
+         // Checkpoint star ends within this Hindu day
+         dayNakshatras.push({ name: NAKS[currentData.nakIdx], start: nakStartDate, end: nakEndDate });
+         // Next star only if it also ends by next sunrise
          const nextIdx = (currentData.nakIdx + 1) % 27;
          const nextEndAngle = (nextIdx + 1) * (360 / 27);
          const nextEndDate = findEndTime(nextEndAngle, jdNak + 1.0);
-         dayNakshatras.push({ name: NAKS[nextIdx], start: nakEndDate, end: nextEndDate });
+         if (nextEndDate <= dayEnd) {
+            dayNakshatras.push({ name: NAKS[nextIdx], start: nakEndDate, end: nextEndDate });
+         }
+      } else if (dayNakshatras.length === 0) {
+         // Nothing ended today: keep spanning checkpoint star (Nazhika 60)
+         dayNakshatras.push({ name: NAKS[currentData.nakIdx], start: nakStartDate, end: nakEndDate });
       }
 
 

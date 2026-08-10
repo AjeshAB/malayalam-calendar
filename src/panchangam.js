@@ -65,8 +65,8 @@ function calcEndNazhika(sunriseDate, endDate) {
   if (!sunriseDate || !endDate) return null;
   const diffMs = endDate.getTime() - sunriseDate.getTime();
   if (!Number.isFinite(diffMs)) return null;
-  // Floor (not round): traditional panchang quotes completed nazhikas after sunrise
-  const nazhika = Math.floor(diffMs / (24 * 60 * 1000));
+  // Round to nearest nazhika (printed calendars quote a whole number)
+  const nazhika = Math.round(diffMs / (24 * 60 * 1000));
   if (nazhika < 0) return null;
   return Math.min(nazhika, 60);
 }
@@ -91,8 +91,7 @@ function getPanchangam(dateStr, lat = 11.074462304803008, lng = 76.2824402223553
     const lastNak = nakData.DayNakshatras[nakData.DayNakshatras.length - 1];
     dayNakshathram = { en: mlToEn[lastNak.name] || lastNak.name, ml: lastNak.name };
   } else {
-    const baseName = nakName.split(' & ')[0];
-    dayNakshathram = { en: mlToEn[baseName] || baseName, ml: nakName };
+    dayNakshathram = { en: mlToEn[nakName] || nakName, ml: nakName };
   }
 
   // Tithi
@@ -168,7 +167,6 @@ function getNextNakshatraDates(nakName, count = 1, lat = 11.074462304803008, lng
   let startDate = new Date();
   startDate.setHours(12, 0, 0, 0);
   for (let i = 0; i < count; i++) {
-    // Manual search with includes() to handle compound names like "അശ്വതി & ഭരണി"
     let found = null;
     let curr = new Date(startDate);
     for (let d = 0; d < 40; d++) {

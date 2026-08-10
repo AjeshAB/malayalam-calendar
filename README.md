@@ -65,7 +65,7 @@ Open **http://localhost:3002**
 | Ayanamsa | Lahiri (sidereal / nirayana) |
 | Day system | Sunrise-based (സൂര്യോദയാധിഷ്ഠിത ദിനക്രമം) |
 | 6 Nazhika rule | Checkpoint at sunrise + 162 min; same star two days → first day is nakshathram-less |
-| Nazhika end | `floor((nakshatra_end − sunrise) / 24 min)`; capped at 60 (sunrise→sunrise day) |
+| Nazhika end | `round((nakshatra_end − sunrise) / 24 min)`; capped at 60 (sunrise→sunrise day) |
 | Vishu | Mesha Sankranti before sunrise → that day; after → next day |
 | Kollavarsham | From solar Sankranti positions (not lookup tables) |
 

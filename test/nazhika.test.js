@@ -15,7 +15,7 @@ const { getPanchangam } = require('../src/panchangam');
   );
 }
 
-/** Same-day ends still use floor of completed nazhikas (not capped). */
+/** Same-day ends use nearest nazhika (round), capped at 60. */
 {
   const p = getPanchangam('2026-10-14');
   const anizham = p.nakshatramDetails.find(n => n.nakshatram.en === 'Anizham');
@@ -23,12 +23,12 @@ const { getPanchangam } = require('../src/panchangam');
   assert.strictEqual(anizham.endNazhika, 54);
 }
 
-/** Ends before sunrise stay hidden. */
+/** 2026-10-30 Makiryam ends ~6.93 nazhika after sunrise → rounds to 7. */
 {
-  const p = getPanchangam('2026-10-15');
-  const anizham = p.nakshatramDetails.find(n => n.nakshatram.en === 'Anizham');
-  assert.ok(anizham, 'expected Anizham residue on 2026-10-15');
-  assert.strictEqual(anizham.endNazhika, null);
+  const p = getPanchangam('2026-10-30');
+  const makiryam = p.nakshatramDetails.find(n => n.nakshatram.en === 'Makiryam');
+  assert.ok(makiryam, 'expected Makiryam on 2026-10-30');
+  assert.strictEqual(makiryam.endNazhika, 7);
 }
 
 console.log('nazhika.test.js: ok');

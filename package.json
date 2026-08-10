@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node test/nazhika.test.js"
+    "test": "node test/nazhika.test.js && node test/day-nakshatras.test.js"
   },
   "keywords": [
     "panchangam",
