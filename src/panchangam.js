@@ -59,15 +59,16 @@ function formatDateTimeIST(d) {
 }
 
 /** Nazhikas (ghatis) after sunrise until nakshatra end. 1 nazhika = 24 minutes.
- *  Returns null when end is missing or outside 0–60 (same day after sunrise). */
+ *  Returns null when end is missing or before sunrise. A traditional day is 60
+ *  nazhika (sunrise→sunrise); ends after that are capped at 60, not hidden. */
 function calcEndNazhika(sunriseDate, endDate) {
   if (!sunriseDate || !endDate) return null;
   const diffMs = endDate.getTime() - sunriseDate.getTime();
   if (!Number.isFinite(diffMs)) return null;
   // Floor (not round): traditional panchang quotes completed nazhikas after sunrise
   const nazhika = Math.floor(diffMs / (24 * 60 * 1000));
-  if (nazhika < 0 || nazhika > 60) return null;
-  return nazhika;
+  if (nazhika < 0) return null;
+  return Math.min(nazhika, 60);
 }
 
 function getPanchangam(dateStr, lat = 11.074462304803008, lng = 76.28244022235538) {
