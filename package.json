@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node test/nazhika.test.js && node test/day-nakshatras.test.js"
+    "test": "node test/nazhika.test.js && node test/day-nakshatras.test.js && node test/chandra-rashi.test.js && node test/horoscope-signals.test.js && node test/horoscope-prose.test.js && node test/horoscope-api.test.js && node test/observances.test.js && node test/observance-days.test.js && node test/year-cache.test.js"
   },
   "keywords": [
     "panchangam",
@@ -45,6 +45,7 @@
   ],
   "dependencies": {
     "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
     "express": "^5.2.1"
   }
 }

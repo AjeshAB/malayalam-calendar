@@ -351,9 +351,23 @@ body {
 
 .vishesham-list li {
   border: 1px solid var(--palm-dark);
-  padding: 0.25rem 0.7rem;
+  padding: 0.3rem 0.75rem 0.35rem;
   font-weight: 600;
   font-size: 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.vishesham-en {
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.cal-vishesham-en {
+  font-weight: 400;
+  opacity: 0.75;
 }
 
 .timing-row {
@@ -642,6 +656,95 @@ body {
   .toolbar {
     flex-direction: column;
   }
+}
+
+/* Horoscope / രാശിഫലം */
+.horoscope-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.horoscope-card-head .leaf-h {
+  margin: 0;
+}
+
+.leaf-en {
+  font-weight: 400;
+  font-size: 0.85em;
+  opacity: 0.75;
+}
+
+.tone-chip {
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--leaf-rule);
+  padding: 0.2rem 0.45rem;
+  white-space: nowrap;
+}
+
+.tone-favourable {
+  border-color: var(--brass);
+  background: rgba(28, 23, 18, 0.04);
+}
+
+.tone-mixed {
+  background: transparent;
+}
+
+.tone-cautious {
+  border-color: var(--ink);
+  background: rgba(120, 40, 20, 0.06);
+}
+
+.horoscope-card-moon {
+  border-left: 3px solid var(--brass);
+  padding-left: 0.75rem;
+}
+
+.horoscope-moon-tag {
+  font-size: 0.8rem;
+  margin: 0 0 0.5rem;
+  opacity: 0.8;
+}
+
+.horoscope-summary-ml {
+  margin: 0.35rem 0;
+  line-height: 1.55;
+}
+
+.horoscope-summary-en {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.92rem;
+  opacity: 0.85;
+  line-height: 1.5;
+}
+
+.horoscope-details {
+  margin-top: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.horoscope-details summary {
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.horoscope-disclaimer {
+  margin-top: 1.25rem;
+  font-size: 0.8rem;
+  opacity: 0.75;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.horoscope-mode {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  opacity: 0.85;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -4,6 +4,8 @@
  * Based on highly accurate astronomical algorithms (NASA/Moshier/JPL adaptations).
  */
 
+const { buildCoreObservances, pradoshWindow, hasObservance, NAK_AAYILYAM } = require('./observances');
+
 const d2r = Math.PI / 180;
 const r2d = 180 / Math.PI;
 
@@ -417,7 +419,9 @@ class Panchang {
             karanaIdx = (nk - 1) % 7;
          }
 
-         return { nakIdx, tithiIdx, yogaIdx, karanaIdx, ayan };
+         const chandraRashiIdx = Math.floor(lMoonNirayana / 30);
+
+         return { nakIdx, tithiIdx, yogaIdx, karanaIdx, ayan, lMoonNirayana, chandraRashiIdx };
       };
 
       // Get Elements at Checkpoint
@@ -511,6 +515,12 @@ class Panchang {
       } else if (dayNakshatras.length === 0) {
          // Nothing ended today: keep spanning checkpoint star (Nazhika 60)
          dayNakshatras.push({ name: NAKS[currentData.nakIdx], start: nakStartDate, end: nakEndDate });
+      }
+
+      // When only one star ends this Hindu day, printed calendars use it as the day name
+      // (even if the 6-nazhika checkpoint has already moved to the next star).
+      if (dayNakshatras.length === 1 && finalNakName !== 'ഇന്ന് നാൾ ഇല്ല') {
+         finalNakName = dayNakshatras[0].name;
       }
 
 
@@ -687,6 +697,25 @@ class Panchang {
       };
       const tithiEndDate = findTithiEnd(tithiEndAngle);
 
+      // Observance anchors: sunrise index owns the civil day (Ekadashi, Shashti,
+      // Amavasi, Aayilyam). Pradosham uses Trayodashi overlap with pradosh kaal,
+      // not the sunrise tithi table and not a single sunset instant.
+      let sunriseTithiIdx = null;
+      let sunriseNakIdx = null;
+      let sunsetTithiIdx = null;
+      let pradoshStartTithiIdx = null;
+      let pradoshEndTithiIdx = null;
+      if (sunTimes.sunriseDate && sunTimes.sunsetDate) {
+         const toJD = (dt) => (dt.getTime() / 86400000.0) + 2440587.5;
+         const srEl = getElements(toJD(sunTimes.sunriseDate));
+         sunriseTithiIdx = srEl.tithiIdx;
+         sunriseNakIdx = srEl.nakIdx;
+         sunsetTithiIdx = getElements(toJD(sunTimes.sunsetDate)).tithiIdx;
+         const window = pradoshWindow(sunTimes.sunsetDate);
+         pradoshStartTithiIdx = getElements(toJD(window.start)).tithiIdx;
+         pradoshEndTithiIdx = getElements(toJD(window.end)).tithiIdx;
+      }
+
       // 7. Special Days (Vishesham) Check
       // Rule 1: First Thursday of Kollavarsham Month
       // - Day is Thursday (4)
@@ -701,8 +730,8 @@ class Panchang {
          specialEvents.push("മുപ്പെട്ടുശനി");
       }
 
-      // Rule 3: Ayilyam Nakshatra -> Naga Pooja
-      if (finalNakName.indexOf("ആയില്യം") !== -1) {
+      // Rule 3: Ayilyam at sunrise -> Naga Pooja (not the 6-nazhika day name)
+      if (sunriseNakIdx === NAK_AAYILYAM) {
          specialEvents.push("നാഗപൂജ");
       }
 
@@ -712,18 +741,6 @@ class Panchang {
       }
 
       // ---- Major Festivals & Visheshadivasangal ----
-
-      // Tithi at sunrise for festival checks
-      let sunriseTithiIdx = null;
-      let sunsetTithiIdx = null;
-      if (sunTimes.sunriseDate && sunTimes.sunsetDate) {
-         const srJD = (sunTimes.sunriseDate.getTime() / 86400000.0) + 2440587.5;
-         const ssJD = (sunTimes.sunsetDate.getTime() / 86400000.0) + 2440587.5;
-         sunriseTithiIdx = getElements(srJD).tithiIdx;
-         sunsetTithiIdx = getElements(ssJD).tithiIdx;
-      }
-
-      const nakIdx = currentData.nakIdx;
 
       // === ONAM === Thiruvonam nakshathram in Chingam (malMonth=4)
       if (malMonth === 4 && finalNakName.indexOf("തിരുവോണം") !== -1) {
@@ -915,20 +932,12 @@ class Panchang {
       const yamaSeg = [4, 3, 2, 1, 0, 6, 5];
       const guliSeg = [6, 5, 4, 3, 2, 1, 0];
 
-      // 9. Tithi Flags (Refined: Sunrise/Sunset based)
-      if (sunriseTithiIdx !== null) {
-         // Ekadashi (Sunrise)
-         if (sunriseTithiIdx === 10 || sunriseTithiIdx === 25) specialEvents.push("ഏകാദശി");
-
-         // Amavasya (Sunrise)
-         if (sunriseTithiIdx === 29) specialEvents.push("അമാവാസി");
-
-         // Pournami (Sunrise)
-         if (sunriseTithiIdx === 14) specialEvents.push("പൗർണ്ണമി");
-
-         // Pradosham (Sunset)
-         if (sunsetTithiIdx === 12 || sunsetTithiIdx === 27) specialEvents.push("പ്രദോഷം");
-      }
+      specialEvents.push(...buildCoreObservances({
+         sunriseTithiIdx,
+         sunriseNakIdx,
+         pradoshStartTithiIdx,
+         pradoshEndTithiIdx
+      }));
 
       return {
          Day: { name: WD[d.getDay()] },
@@ -965,6 +974,17 @@ class Panchang {
             Gulika: getTiming(guliSeg)
          },
          Vishesham: specialEvents,
+         ChandraRashi: {
+            index: currentData.chandraRashiIdx,
+            name: ZN[currentData.chandraRashiIdx]
+         },
+         ObservanceAnchors: {
+            sunriseTithiIdx,
+            sunriseNakIdx,
+            sunsetTithiIdx,
+            pradoshStartTithiIdx,
+            pradoshEndTithiIdx
+         },
          // Meta
          Location: { lat, lon }
       };
@@ -988,7 +1008,7 @@ class Panchang {
       // Limit search to 90 days (approx 3 months)
       for (let i = 0; i < 90; i++) {
          const res = this.calculate(curr, { lat: this.defaultLat, lon: this.defaultLon });
-         if (res.Vishesham && res.Vishesham.includes(eventName)) {
+         if (hasObservance(res.Vishesham, eventName)) {
             return { date: new Date(curr), details: res };
          }
          curr.setDate(curr.getDate() + 1);

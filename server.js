@@ -1,7 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+require('dotenv').config();
 const { getPanchangam, getNextNakshatraDates, convertKvToGregorian, getUpcomingEvents, getAllNakshatras, getPanchangamCsvRows } = require('./src/panchangam');
+const { getDailyHoroscope } = require('./src/horoscope');
+const { getYearCached, getMonthCached } = require('./src/year-cache');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -24,6 +27,28 @@ app.get('/api/panchangam', (req, res) => {
   }
 });
 
+app.get('/api/horoscope/daily', async (req, res) => {
+  try {
+    const { date, lat, lng, lang } = req.query;
+    const dateStr = date || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ error: 'Invalid date; use YYYY-MM-DD' });
+    }
+    const latitude = parseFloat(lat) || 11.074462304803008;
+    const longitude = parseFloat(lng) || 76.28244022235538;
+    const language = lang || 'both';
+
+    const result = await getDailyHoroscope(dateStr, latitude, longitude, language);
+    res.json(result);
+  } catch (err) {
+    if (err.message && /lang must be/.test(err.message)) {
+      return res.status(400).json({ error: err.message });
+    }
+    console.error('Horoscope error:', err);
+    res.status(500).json({ error: 'Failed to generate horoscope', details: err.message });
+  }
+});
+
 app.get('/api/panchangam/month', (req, res) => {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
@@ -31,32 +56,33 @@ app.get('/api/panchangam/month', (req, res) => {
     const lat = parseFloat(req.query.lat) || 11.074462304803008;
     const lng = parseFloat(req.query.lng) || 76.28244022235538;
 
-    const daysInMonth = new Date(year, month, 0).getDate();
-    const days = [];
-
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const p = getPanchangam(dateStr, lat, lng);
-      days.push({
-        date: dateStr,
-        day: d,
-        gregorianDay: p.gregorian.day,
-        weekdayMl: p.weekday.ml,
-        kvMonth: p.kollavarsham.month,
-        kvMonthMl: p.kollavarsham.monthMl,
-        kvDay: p.kollavarsham.day,
-        kvYear: p.kollavarsham.year,
-        nakshathram: p.nakshathram.en,
-        nakshathramMl: p.nakshathram.ml,
-        isNakshatramLess: p.isNakshatramLess,
-        vishesham: p.vishesham || []
-      });
-    }
-
-    res.json({ year, month, days });
+    const { data, cache } = getMonthCached(year, month, lat, lng);
+    res.setHeader('X-Cache', cache);
+    res.json(data);
   } catch (err) {
     console.error('Month API error:', err);
+    if (err.message && /Invalid (year|month)/.test(err.message)) {
+      return res.status(400).json({ error: err.message });
+    }
     res.status(500).json({ error: 'Failed to calculate month data', details: err.message });
+  }
+});
+
+app.get('/api/panchangam/year', (req, res) => {
+  try {
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    const lat = parseFloat(req.query.lat) || 11.074462304803008;
+    const lng = parseFloat(req.query.lng) || 76.28244022235538;
+
+    const { data, cache } = getYearCached(year, lat, lng);
+    res.setHeader('X-Cache', cache);
+    res.json(data);
+  } catch (err) {
+    console.error('Year API error:', err);
+    if (err.message && /Invalid year/.test(err.message)) {
+      return res.status(400).json({ error: err.message });
+    }
+    res.status(500).json({ error: 'Failed to calculate year data', details: err.message });
   }
 });
 
@@ -145,6 +171,10 @@ app.get('/api/tools/export-csv', (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Malayalam Panchangam server running at http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Malayalam Panchangam server running at http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;

@@ -5,6 +5,7 @@ const nextBtn = document.getElementById('nextDay');
 const todayBtn = document.getElementById('today');
 const calToggle = document.getElementById('calToggle');
 const toolsToggle = document.getElementById('toolsToggle');
+const horoscopeToggle = document.getElementById('horoscopeToggle');
 
 function formatDate(d) {
   if (d instanceof Date) {
@@ -19,11 +20,34 @@ function displayDate(isoStr) {
   return `${d}/${MONTH_ABBR[parseInt(m) - 1]}/${y}`;
 }
 
+function visheshamItems(list) {
+  return (list || []).map((v) => {
+    if (v && typeof v === 'object') return { ml: v.ml || '', en: v.en || '' };
+    const text = String(v);
+    const i = text.indexOf(' · ');
+    if (i >= 0) return { ml: text.slice(0, i), en: text.slice(i + 3) };
+    return { ml: text, en: '' };
+  });
+}
+
 let currentDate = new Date();
-let currentView = 'daily'; // 'daily' | 'calendar' | 'tools'
+let currentView = 'daily'; // 'daily' | 'calendar' | 'tools' | 'horoscope'
 let calYear = currentDate.getFullYear();
 let calMonth = currentDate.getMonth() + 1;
 datePicker.value = formatDate(currentDate);
+
+function refreshCurrentView() {
+  const dateStr = formatDate(currentDate);
+  if (currentView === 'horoscope') {
+    fetchHoroscope(dateStr);
+  } else if (currentView === 'calendar') {
+    fetchMonthCalendar(calYear, calMonth);
+  } else if (currentView === 'tools') {
+    renderToolsView();
+  } else {
+    fetchPanchangam(dateStr);
+  }
+}
 
 async function fetchPanchangam(dateStr) {
   content.innerHTML = `
@@ -126,9 +150,13 @@ function renderPanchangam(d) {
 
       ${d.vishesham && d.vishesham.length > 0 ? `
       <section class="leaf-section">
-        <h3 class="leaf-h">വിശേഷദിവസങ്ങൾ</h3>
+        <h3 class="leaf-h">വിശേഷദിവസങ്ങൾ / Observances</h3>
         <ul class="vishesham-list">
-          ${d.vishesham.map(v => `<li>${v}</li>`).join('')}
+          ${visheshamItems(d.vishesham).map(v => `
+            <li>
+              <span class="vishesham-ml">${v.ml}</span>
+              ${v.en ? `<span class="vishesham-en">${v.en}</span>` : ''}
+            </li>`).join('')}
         </ul>
       </section>
       ` : ''}
@@ -155,22 +183,76 @@ function renderPanchangam(d) {
 // Calendar functions
 const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
-const MONTH_NAMES_ML = ['', 'ജനുവരി', 'ഫെബ്രുവരി', 'മാർച്ച്', 'ഏപ്രിൽ', 'മേയ്', 'ജൂൺ',
-  'ജൂലൈ', 'ഓഗസ്റ്റ്', 'സെപ്റ്റംബർ', 'ഒക്ടോബർ', 'നവംബർ', 'ഡിസംബർ'];
 const WEEKDAY_HEADERS_ML = ['ഞായർ', 'തിങ്കൾ', 'ചൊവ്വ', 'ബുധൻ', 'വ്യാഴം', 'വെള്ളി', 'ശനി'];
 
+/** Client year cache: Map year → { year, months: { [1-12]: { year, month, days } } } */
+const yearCache = new Map();
+const yearInflight = new Map();
+const YEAR_CACHE_MAX = 3;
+
+function packYearPayload(data) {
+  const months = {};
+  for (const m of data.months) months[m.month] = m;
+  return { year: data.year, months };
+}
+
+function rememberYear(year, packed) {
+  if (yearCache.has(year)) yearCache.delete(year);
+  yearCache.set(year, packed);
+  while (yearCache.size > YEAR_CACHE_MAX) {
+    yearCache.delete(yearCache.keys().next().value);
+  }
+}
+
+async function loadYearCalendar(year) {
+  if (yearCache.has(year)) {
+    const packed = yearCache.get(year);
+    rememberYear(year, packed);
+    return packed;
+  }
+  if (yearInflight.has(year)) return yearInflight.get(year);
+
+  const pending = fetch(`/api/panchangam/year?year=${year}`)
+    .then(async (res) => {
+      const data = await res.json();
+      if (data.error) throw new Error(data.details || data.error);
+      const packed = packYearPayload(data);
+      rememberYear(year, packed);
+      return packed;
+    })
+    .finally(() => {
+      yearInflight.delete(year);
+    });
+
+  yearInflight.set(year, pending);
+  return pending;
+}
+
+/** Prefetch next year when 2 months remain (Nov/Dec); prev year in Jan/Feb. */
+function prefetchAdjacentYears(year, month) {
+  if (month >= 11) loadYearCalendar(year + 1).catch(() => {});
+  if (month <= 2) loadYearCalendar(year - 1).catch(() => {});
+}
+
 async function fetchMonthCalendar(year, month) {
+  const cached = yearCache.get(year);
+  if (cached && cached.months[month]) {
+    renderCalendar(cached.months[month]);
+    prefetchAdjacentYears(year, month);
+    return;
+  }
+
   content.innerHTML = `
     <div class="loading">
       <div class="spinner"></div>
-      <br>മാസ കലണ്ടർ ലോഡ് ചെയ്യുന്നു...
+      <br>വർഷ കലണ്ടർ ലോഡ് ചെയ്യുന്നു...
     </div>`;
 
   try {
-    const res = await fetch(`/api/panchangam/month?year=${year}&month=${month}`);
-    const data = await res.json();
-    if (data.error) throw new Error(data.details || data.error);
-    renderCalendar(data);
+    const packed = await loadYearCalendar(year);
+    if (currentView !== 'calendar') return;
+    renderCalendar(packed.months[month]);
+    prefetchAdjacentYears(year, month);
   } catch (err) {
     content.innerHTML = `<div class="loading" style="color:red;">Error: ${err.message}</div>`;
   }
@@ -206,9 +288,11 @@ function renderCalendar(data) {
     cells += `
       <div class="${classes}" onclick="switchToDay('${day.date}')">
         <div class="cal-greg-date">${day.day}</div>
-        <div class="cal-kv-date">${day.kvMonthMl} ${day.kvDay}</div>
-        <div class="cal-nak">${day.isNakshatramLess ? 'നക്ഷത്രം ഇല്ല' : day.nakshathramMl}</div>
-        ${hasVishesham ? `<div class="cal-vishesham-tag">${day.vishesham.join(', ')}</div>` : ''}
+        <div class="cal-kv-date">${day.kvDay}</div>
+        <div class="cal-nak">${day.isNakshatramLess ? 'No star' : day.nakshathram}</div>
+        ${hasVishesham ? `<div class="cal-vishesham-tag">${visheshamItems(day.vishesham).map(v =>
+          v.en ? `${v.ml} <span class="cal-vishesham-en">${v.en}</span>` : v.ml
+        ).join(', ')}</div>` : ''}
       </div>`;
   }
 
@@ -216,7 +300,7 @@ function renderCalendar(data) {
     <div class="leaf leaf-enter calendar-leaf">
       <div class="calendar-header">
         <button type="button" class="nav-btn" onclick="changeMonth(-1)">◀ മുൻപത്തെ</button>
-        <h2>${MONTH_NAMES_ML[month]} ${year}<span class="cal-en"> / ${MONTH_NAMES[month]} ${year}</span></h2>
+        <h2>${MONTH_NAMES[month]} ${year}</h2>
         <button type="button" class="nav-btn" onclick="changeMonth(1)">അടുത്ത ▶</button>
       </div>
       <div class="back-to-daily">
@@ -253,25 +337,25 @@ function switchToDailyView() {
 // Event listeners
 datePicker.addEventListener('change', () => {
   currentDate = new Date(datePicker.value + 'T12:00:00');
-  fetchPanchangam(datePicker.value);
+  refreshCurrentView();
 });
 
 prevBtn.addEventListener('click', () => {
   currentDate.setDate(currentDate.getDate() - 1);
   datePicker.value = formatDate(currentDate);
-  fetchPanchangam(formatDate(currentDate));
+  refreshCurrentView();
 });
 
 nextBtn.addEventListener('click', () => {
   currentDate.setDate(currentDate.getDate() + 1);
   datePicker.value = formatDate(currentDate);
-  fetchPanchangam(formatDate(currentDate));
+  refreshCurrentView();
 });
 
 todayBtn.addEventListener('click', () => {
   currentDate = new Date();
   datePicker.value = formatDate(currentDate);
-  fetchPanchangam(formatDate(currentDate));
+  refreshCurrentView();
 });
 
 calToggle.addEventListener('click', () => {
@@ -294,9 +378,86 @@ toolsToggle.addEventListener('click', () => {
     fetchPanchangam(formatDate(currentDate));
   } else {
     currentView = 'tools';
+    calToggle.textContent = 'മാസം';
     renderToolsView();
   }
 });
+
+horoscopeToggle.addEventListener('click', () => {
+  if (currentView === 'horoscope') {
+    currentView = 'daily';
+    fetchPanchangam(formatDate(currentDate));
+  } else {
+    currentView = 'horoscope';
+    calToggle.textContent = 'മാസം';
+    fetchHoroscope(formatDate(currentDate));
+  }
+});
+
+// === Horoscope (രാശിഫലം) View ===
+
+const TONE_LABEL = {
+  favourable: { ml: 'അനുകൂലം', en: 'Favourable' },
+  mixed: { ml: 'മിശ്രം', en: 'Mixed' },
+  cautious: { ml: 'ജാഗ്രത', en: 'Cautious' }
+};
+
+async function fetchHoroscope(dateStr) {
+  content.innerHTML = `
+    <div class="loading">
+      <div class="spinner"></div>
+      <br>രാശിഫലം ലോഡ് ചെയ്യുന്നു...
+    </div>`;
+
+  try {
+    const res = await fetch(`/api/horoscope/daily?date=${dateStr}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.details || data.error);
+    renderHoroscope(data);
+  } catch (err) {
+    content.innerHTML = `<div class="loading" style="color:red;">
+      Error: ${err.message}
+    </div>`;
+  }
+}
+
+function renderHoroscope(data) {
+  const moon = data.dayContext.chandraRashi;
+  const cards = data.readings.map((r) => {
+    const tone = TONE_LABEL[r.tone] || TONE_LABEL.mixed;
+    const isMoon = r.rashiIndex === moon.index;
+    return `
+      <section class="leaf-section horoscope-card ${isMoon ? 'horoscope-card-moon' : ''}">
+        <div class="horoscope-card-head">
+          <h3 class="leaf-h">${r.rashi.ml} <span class="leaf-en">${r.rashi.en}</span></h3>
+          <span class="tone-chip tone-${r.tone}">${tone.ml} · ${tone.en}</span>
+        </div>
+        ${isMoon ? '<p class="horoscope-moon-tag">ഇന്നത്തെ ചന്ദ്രരാശി · Moon today</p>' : ''}
+        <p class="horoscope-summary-ml">${r.summary.ml}</p>
+        <p class="horoscope-summary-en">${r.summary.en}</p>
+        <details class="horoscope-details">
+          <summary>മാർഗനിർദ്ദേശം · Guidance</summary>
+          <p>${r.guidance.ml}</p>
+          <p class="horoscope-summary-en">${r.guidance.en}</p>
+        </details>
+      </section>`;
+  }).join('');
+
+  content.innerHTML = `
+    <article class="leaf leaf-enter horoscope-leaf">
+      <div class="back-to-daily">
+        <button type="button" class="nav-btn" onclick="switchToDailyView()">← ദിവസ വിവരങ്ങൾ</button>
+      </div>
+      <header class="leaf-hero">
+        <p class="leaf-kicker">രാശിഫലം</p>
+        <h2 class="leaf-date">${displayDate(data.date)}</h2>
+        <p class="leaf-sub">ചന്ദ്രരാശി: ${moon.ml} · ${moon.en}</p>
+        <p class="horoscope-mode">പാഠം · Prose: <strong>${data.proseMode === 'llm' ? 'Gemini' : 'Template'}</strong></p>
+      </header>
+      ${cards}
+      <p class="horoscope-disclaimer">ജ്യോതിഷ സൂചന മാത്രം · For guidance only — not medical, legal, or financial advice.</p>
+    </article>`;
+}
 
 // === Tools View ===
 

@@ -1,4 +1,5 @@
 const { Panchang } = require('./panchang-engine');
+const { toVisheshamItem, formatObservanceName } = require('./observances');
 
 const panchang = new Panchang();
 
@@ -65,10 +66,10 @@ function calcEndNazhika(sunriseDate, endDate) {
   if (!sunriseDate || !endDate) return null;
   const diffMs = endDate.getTime() - sunriseDate.getTime();
   if (!Number.isFinite(diffMs)) return null;
-  // Round to nearest nazhika (printed calendars quote a whole number)
-  const nazhika = Math.round(diffMs / (24 * 60 * 1000));
+  const nazhika = diffMs / (24 * 60 * 1000);
   if (nazhika < 0) return null;
-  return Math.min(nazhika, 60);
+  if (nazhika >= 60) return 60;
+  return Math.round(nazhika * 100) / 100;
 }
 
 function getPanchangam(dateStr, lat = 11.074462304803008, lng = 76.28244022235538) {
@@ -140,6 +141,11 @@ function getPanchangam(dateStr, lat = 11.074462304803008, lng = 76.2824402223553
       en: lookup(RASHI_ML, RASHI_EN, nakData.Malayalam.month),
       ml: nakData.Malayalam.month
     },
+    chandraRashi: {
+      index: nakData.ChandraRashi.index,
+      en: RASHI_EN[nakData.ChandraRashi.index],
+      ml: nakData.ChandraRashi.name
+    },
     yoga: {
       en: lookup(YOG_ML, YOG_EN, nakData.Yoga.name),
       ml: nakData.Yoga.name
@@ -150,7 +156,7 @@ function getPanchangam(dateStr, lat = 11.074462304803008, lng = 76.2824402223553
     },
     sunrise: formatAMPM(nakData.SunTimes.sunrise),
     sunset: formatAMPM(nakData.SunTimes.sunset),
-    vishesham: nakData.Vishesham || [],
+    vishesham: (nakData.Vishesham || []).map(toVisheshamItem),
     timings: {
       rahukalam: formatTimingAMPM(nakData.Timings.Rahukalam),
       yamagandam: formatTimingAMPM(nakData.Timings.Yamagandam),
@@ -208,7 +214,8 @@ function getUpcomingEvents(count = 5, search = '') {
   const events = panchang.findUpcomingEvents(new Date(), count * 3);
   let filtered = events;
   if (search) {
-    filtered = events.filter(e => e.name.includes(search));
+    const q = search.toLowerCase();
+    filtered = events.filter((e) => String(e.name).toLowerCase().includes(q));
   }
   return filtered.slice(0, count).map(e => {
     const dateStr = e.date.toISOString().split('T')[0];
@@ -276,11 +283,47 @@ function flattenPanchangamForCsv(record) {
     karana_ml: record.karana.ml,
     sunrise: record.sunrise,
     sunset: record.sunset,
-    vishesham: (record.vishesham || []).join('; '),
+    vishesham: (record.vishesham || []).map(formatObservanceName).join('; '),
     rahukalam: record.timings.rahukalam,
     yamagandam: record.timings.yamagandam,
     gulika: record.timings.gulika
   };
+}
+
+function monthCellFromPanchangam(dateStr, day, p) {
+  return {
+    date: dateStr,
+    day,
+    gregorianDay: p.gregorian.day,
+    weekdayMl: p.weekday.ml,
+    kvMonth: p.kollavarsham.month,
+    kvMonthMl: p.kollavarsham.monthMl,
+    kvDay: p.kollavarsham.day,
+    kvYear: p.kollavarsham.year,
+    nakshathram: p.nakshathram.en,
+    nakshathramMl: p.nakshathram.ml,
+    isNakshatramLess: p.isNakshatramLess,
+    vishesham: p.vishesham || []
+  };
+}
+
+function getMonthSummary(year, month, lat = 11.074462304803008, lng = 76.28244022235538) {
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const days = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const p = getPanchangam(dateStr, lat, lng);
+    days.push(monthCellFromPanchangam(dateStr, d, p));
+  }
+  return { year, month, days };
+}
+
+function getYearCalendar(year, lat = 11.074462304803008, lng = 76.28244022235538) {
+  const months = [];
+  for (let month = 1; month <= 12; month++) {
+    months.push(getMonthSummary(year, month, lat, lng));
+  }
+  return { year, months };
 }
 
 function getPanchangamCsvRows(startDate, endDate, lat = 11.074462304803008, lng = 76.28244022235538) {
@@ -300,4 +343,13 @@ function getPanchangamCsvRows(startDate, endDate, lat = 11.074462304803008, lng 
   return rows;
 }
 
-module.exports = { getPanchangam, getNextNakshatraDates, convertKvToGregorian, getUpcomingEvents, getAllNakshatras, getPanchangamCsvRows };
+module.exports = {
+  getPanchangam,
+  getNextNakshatraDates,
+  convertKvToGregorian,
+  getUpcomingEvents,
+  getAllNakshatras,
+  getPanchangamCsvRows,
+  getMonthSummary,
+  getYearCalendar
+};
